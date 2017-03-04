@@ -25,6 +25,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/leanovate/gopter"
+	"github.com/leanovate/gopter/gen"
+	"github.com/leanovate/gopter/prop"
+
 	"github.com/purpleidea/mgmt/resources"
 	"github.com/purpleidea/mgmt/util"
 )
@@ -625,6 +629,62 @@ func TestPgraphT11(t *testing.T) {
 	if rev := Reverse([]*Vertex{v6, v5, v4, v3, v2, v1}); !reflect.DeepEqual(rev, []*Vertex{v1, v2, v3, v4, v5, v6}) {
 		t.Errorf("reverse of vertex slice failed")
 	}
+}
+
+func TestPgraphProperties(t *testing.T) {
+	parameters := gopter.DefaultTestParameters()
+
+	properties := gopter.NewProperties(parameters)
+
+	// Proves that despite the vertices adding and then deleting an edge will
+	// always end in zero edges
+	//
+	// NOTE: If we had equality support we can test if they are exactly the same
+	// graph.
+	properties.Property("G.AddEdge().DeleteEdge() is G", prop.ForAll(
+		func(s1 string, s2 string, s3 string) bool {
+			G := NewGraph("g")
+			// g := (*G)
+
+			v1 := NV(s1)
+			v2 := NV(s2)
+			e1 := NewEdge(s3)
+
+			G.AddEdge(v1, v2, e1) // makes G.NumEdges 1
+			G.DeleteEdge(e1)      // makes G.NumEdges 0
+
+			if G.NumEdges() == 0 {
+				return true
+			}
+
+			return false
+
+			// return (*G) == g
+		},
+		gen.NumString(),
+		gen.NumString(),
+		gen.NumString(),
+	))
+
+	// Proves that even when misused that it won't panic
+	properties.Property("DeleteEdge doesn't panic on ", prop.ForAll(
+		func(s1 string, s2 string) bool {
+			G := NewGraph("g")
+
+			v1 := NV("v1")
+			v2 := NV("v2")
+			e1 := NewEdge(s1)
+
+			G.AddEdge(v1, v2, e1)
+			G.DeleteEdge(NewEdge(s2))
+
+			return true
+		},
+		gen.NumString(),
+		gen.NumString(),
+	))
+
+	properties.TestingRun(t)
 }
 
 type NoopResTest struct {
